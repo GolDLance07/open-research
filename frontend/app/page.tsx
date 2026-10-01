@@ -69,24 +69,20 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
 
   // Challenge My Idea state
-  const [challengeInput, setChallengeInput] = useState(
-    "We will fine-tune a compact MobileNetV4 with INT8 quantization for sub-50ms leaf pathology diagnosis on low-cost devices."
-  );
+  const [challengeInput, setChallengeInput] = useState("");
   const [challengeResult, setChallengeResult] = useState<any>(null);
   const [challenging, setChallenging] = useState(false);
 
   // New Project Modal
   const [showModal, setShowModal] = useState(false);
-  const [newName, setNewName] = useState("AgriVision Crop Disease Diagnostic");
-  const [newProblem, setNewProblem] = useState(
-    "Build an AI system for early detection of crop diseases in low-resource environments with high accuracy and explainability."
-  );
-  const [newRules, setNewRules] = useState("36 hours limit. Open-source release under Apache-2.0 or MIT.");
-  const [newJudging, setNewJudging] = useState("Practical accuracy, edge inference feasibility, and transparent evidence provenance.");
+  const [newName, setNewName] = useState("");
+  const [newProblem, setNewProblem] = useState("");
+  const [newRules, setNewRules] = useState("Open-source release required under an OSI-approved license. 36 hours time window.");
+  const [newJudging, setNewJudging] = useState("Technical innovation, demonstrable feasibility, evidence traceability, and MVP execution.");
   const [newTeamSize, setNewTeamSize] = useState(4);
   const [newTimeHours, setNewTimeHours] = useState(36);
-  const [newSkills, setNewSkills] = useState("Python, PyTorch, React, Edge AI");
-  const [newHardware, setNewHardware] = useState("1x NVIDIA T4 GPU");
+  const [newSkills, setNewSkills] = useState("Python, FastAPI, PyTorch, React");
+  const [newHardware, setNewHardware] = useState("Standard Compute / Single GPU");
 
   const loadData = async () => {
     try {
@@ -618,9 +614,10 @@ export default function Home() {
                 <label className="block text-slate-300 font-semibold mb-1">Project Name:</label>
                 <input
                   type="text"
+                  placeholder="e.g. Autonomous Drone Navigation in GPS-Denied Environments"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white placeholder-slate-500"
                   required
                 />
               </div>
@@ -628,9 +625,10 @@ export default function Home() {
                 <label className="block text-slate-300 font-semibold mb-1">Problem Statement:</label>
                 <textarea
                   rows={3}
+                  placeholder="e.g. Build a visual-inertial odometry system enabling micro-UAVs to navigate indoor warehouse corridors safely without GPS signals..."
                   value={newProblem}
                   onChange={(e) => setNewProblem(e.target.value)}
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white placeholder-slate-500"
                   required
                 />
               </div>

@@ -43,10 +43,12 @@ settings = get_settings()
 )
 async def start_research_run(
     id: str,
-    body: ResearchRunRequest,
-    background_tasks: BackgroundTasks,
+    body: Optional[ResearchRunRequest] = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
 ) -> ResearchRunResponse:
+    if body is None:
+        body = ResearchRunRequest()
     stmt = select(Project).where(Project.id == id)
     res = await db.execute(stmt)
     project = res.scalar_one_or_none()
@@ -321,7 +323,12 @@ async def challenge_idea(
     if len(idea_text) < 10:
         raise HTTPException(status_code=422, detail="Idea text must be at least 10 characters")
 
-    # Retrieve existing sources for context
+    # Retrieve project and existing sources for context
+    p_stmt = select(Project).where(Project.id == id)
+    p_res = await db.execute(p_stmt)
+    proj = p_res.scalar_one_or_none()
+    proj_name = proj.name if proj else "Project"
+
     s_stmt = select(Source).where(Source.project_id == id).limit(5)
     s_res = await db.execute(s_stmt)
     sources = s_res.scalars().all()
@@ -335,21 +342,27 @@ async def challenge_idea(
         },
         issues=[
             {
-                "type": "Generalization / Dataset Drift",
-                "detail": "Field conditions (lighting, partial occlusion) frequently degrade precision reported on clean academic datasets.",
+                "type": "Generalization / Real-world Distribution Shift",
+                "detail": f"Real-world edge cases and noisy inputs for '{idea_text[:60]}' frequently degrade baseline performance reported in academic benchmarks.",
             },
             {
-                "type": "Compute Budget",
-                "detail": "Uncompressed attention backbones may violate edge latency targets.",
+                "type": "Resource & Hardware Constraints",
+                "detail": f"Execution profile must be profiled carefully to avoid violating runtime and memory limits on {proj.hardware if proj else 'target compute'}.",
             },
         ],
         differentiation={
-            "same_as_existing": ["Basic image classification on benchmark crops", "Standard CNN transfer learning"],
-            "differentiation_angles": ["Edge-first INT8 quantization pipeline", "Lightweight visual attribution"],
+            "same_as_existing": [
+                f"Standard baseline techniques identified in related literature for {proj_name}",
+                "Conventional unoptimized processing pipelines",
+            ],
+            "differentiation_angles": [
+                f"Novel combination addressing specific constraints: {idea_text[:80]}",
+                "Streamlined architecture optimized for deterministic fast turnaround",
+            ],
         },
         suggested_investigation=[
-            "Test model resilience against synthetic shadow and glare transforms.",
-            "Benchmark on-device tensor inference memory footprint before finalizing UI.",
+            f"Benchmark {proj_name} under adversarial or noisy input conditions.",
+            "Profile latency bottlenecks on target deployment hardware before freezing MVP scope.",
         ],
     )
     db.add(challenge)

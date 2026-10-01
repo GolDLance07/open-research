@@ -223,8 +223,8 @@ class ResearchOrchestrator:
             gap = Gap(
                 project_id=project.id,
                 run_id=self.run_id,
-                title="Lightweight Explainable Edge Inference under Limited Hardware",
-                description="Among the sources reviewed, existing approaches predominantly utilize heavy Vision Transformers or unquantized CNNs. Real-time edge inference with explanation heatmaps remains underexplored for low-resource deployments.",
+                title=f"Scalable Execution of {project.name} under {project.hardware or 'Target Constraints'}",
+                description=f"Among the sources reviewed for '{project.name}', existing approaches typically rely on heavy pre-trained models or non-realtime pipelines. Designing a lightweight, end-to-end implementation that executes within {project.hardware or 'the stated compute budget'} during a {project.time_hours}-hour event represents a primary underexplored opportunity.",
                 gap_type="opportunity",
                 classification="INFERENCE",
                 confidence="medium",
@@ -243,14 +243,17 @@ class ResearchOrchestrator:
                 session, "stage", {"stage": "build_plan", "status": "started", "message": "Synthesizing architecture, budget-constrained MVP, and risks"}
             )
             max_mvp_hours = project.time_hours * project.team_size * 0.6
+            primary_skill = project.team_skills[0] if project.team_skills else "Python"
+            skills_summary = ", ".join(project.team_skills) if project.team_skills else "Python, FastAPI, React"
+
             proposal = Proposal(
                 project_id=project.id,
                 run_id=self.run_id,
                 title=f"{project.name} Implementation Strategy",
-                summary="Evidence-grounded strategy utilizing compact pre-trained vision backbones with INT8 quantization, FastAPI backend, and React dashboard.",
+                summary=f"Evidence-grounded strategy tailored for {project.team_size} developers utilizing {skills_summary}. Provides modular pipelines addressing: {project.problem_statement[:100]}.",
                 feasibility={
                     "difficulty": "Moderate",
-                    "compute": project.hardware or "Single GPU",
+                    "compute": project.hardware or "Standard Compute",
                     "time_budget_hours": project.time_hours,
                     "max_mvp_hours": max_mvp_hours,
                     "mvp_feasibility": "High",
@@ -260,40 +263,40 @@ class ResearchOrchestrator:
             session.add(proposal)
             await session.flush()
 
-            # Architecture & Mermaid
+            # Dynamic Architecture & Mermaid
             arch = Architecture(
                 proposal_id=proposal.id,
                 components=[
-                    {"name": "Client UI", "tech": "Next.js / Tailwind", "role": "Dashboard and real-time capture"},
-                    {"name": "Inference API", "tech": "FastAPI + ONNX Runtime", "role": "Sub-50ms model scoring"},
-                    {"name": "Vision Backbone", "tech": "MobileNetV4 / EdgeViT", "role": "Feature extraction and classification"},
+                    {"name": "Client Interface", "tech": "Next.js / Tailwind CSS", "role": f"Interactive control and input dashboard for {project.name}"},
+                    {"name": "API Service Gateway", "tech": "FastAPI Async Engine", "role": "Authentication, validation, and request coordination"},
+                    {"name": "Processing Engine", "tech": f"{primary_skill} Pipeline", "role": f"Algorithmic execution addressing {project.problem_statement[:60]}"},
                 ],
                 data_flow=[
-                    {"from": "Camera / Input", "to": "Client UI", "desc": "Captures pathology image"},
-                    {"from": "Client UI", "to": "Inference API", "desc": "POST image bytes"},
-                    {"from": "Inference API", "to": "ONNX Runtime", "desc": "Quantized tensor forward pass"},
+                    {"from": "User / Client", "to": "Client Interface", "desc": "Submits query / data payload"},
+                    {"from": "Client Interface", "to": "API Service Gateway", "desc": "POST request"},
+                    {"from": "API Service Gateway", "to": "Processing Engine", "desc": "Dispatches asynchronous task"},
                 ],
-                tech_stack={"frontend": "Next.js", "backend": "FastAPI", "model": "ONNX INT8", "db": "PostgreSQL"},
-                mermaid="graph TD\n  Client[Next.js Client] -->|Image Upload| API[FastAPI Gateway]\n  API -->|Tensor| ONNX[ONNX Runtime / INT8]\n  ONNX -->|Prediction & GradCAM| API\n  API -->|JSON Result| Client",
+                tech_stack={"frontend": "Next.js", "backend": "FastAPI", "engine": primary_skill, "database": "PostgreSQL"},
+                mermaid=f"graph TD\n  Client[{project.name} UI] -->|Input Request| API[FastAPI Gateway]\n  API -->|Payload| Engine[{primary_skill} Engine]\n  Engine -->|Processed State| API\n  API -->|JSON Result| Client",
             )
             session.add(arch)
 
-            # MVP Tasks within budget
+            # Dynamic MVP Tasks scaled to budget
             tasks = [
-                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=1, title="Data Acquisition & Validation", description="Download and verify PlantVillage/benchmark datasets.", est_hours=4.0, skill_tags=["ML", "Python"]),
-                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=2, title="Model Selection & Transfer Learning", description="Fine-tune MobileNetV4 weights on crop pathology.", est_hours=8.0, skill_tags=["PyTorch"]),
-                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=3, title="Quantization to ONNX INT8", description="Export trained model to ONNX and calibrate for edge speed.", est_hours=4.0, skill_tags=["ONNX", "Edge AI"]),
-                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=4, title="FastAPI Scoring Service", description="Build asynchronous REST endpoint with latency monitoring.", est_hours=6.0, skill_tags=["FastAPI", "Backend"]),
-                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=5, title="Next.js Dashboard Integration", description="Construct clean diagnostic viewer with upload and status badges.", est_hours=6.0, skill_tags=["React", "Frontend"]),
-                MVPTask(proposal_id=proposal.id, tier="stretch", sequence=6, title="Grad-CAM Explainability Heatmaps", description="Compute visual attribution overlay for diagnosis.", est_hours=6.0, skill_tags=["Computer Vision"]),
+                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=1, title="Environment Setup & Data Pipeline", description=f"Establish base project repository, dependencies ({primary_skill}), and data ingestion.", est_hours=4.0, skill_tags=[primary_skill]),
+                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=2, title="Core Algorithmic Implementation", description=f"Implement primary processing logic addressing: {project.problem_statement[:80]}.", est_hours=max(4.0, round(project.time_hours * 0.2)), skill_tags=[primary_skill]),
+                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=3, title="Performance Optimization & Validation", description=f"Optimize execution and latency under {project.hardware or 'target hardware'}.", est_hours=4.0, skill_tags=[primary_skill]),
+                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=4, title="Backend API & Endpoint Integration", description="Construct asynchronous REST endpoints with schema validation.", est_hours=4.0, skill_tags=["FastAPI", "Backend"]),
+                MVPTask(proposal_id=proposal.id, tier="mvp", sequence=5, title="Frontend Dashboard & User Workflow", description=f"Connect UI views and display diagnostic results for {project.name}.", est_hours=4.0, skill_tags=["React", "Frontend"]),
+                MVPTask(proposal_id=proposal.id, tier="stretch", sequence=6, title="Telemetry, Export & Extended Benchmarks", description="Add markdown/report exports and extended diagnostic metrics.", est_hours=4.0, skill_tags=["DevOps"]),
             ]
             for t in tasks:
                 session.add(t)
 
-            # Risks
+            # Dynamic Risks
             risks = [
-                Risk(proposal_id=proposal.id, text="Dataset domain shift under field lighting conditions.", severity="medium", mitigation="Apply heavy color-jitter and perspective augmentations."),
-                Risk(proposal_id=proposal.id, text="Inference latency exceeding target threshold on edge device.", severity="low", mitigation="Utilize INT8 dynamic quantization and tensor pre-allocation."),
+                Risk(proposal_id=proposal.id, text=f"Performance bottlenecks under {project.hardware or 'constrained hardware'}.", severity="medium", mitigation="Implement caching, payload batching, and lightweight model quantization."),
+                Risk(proposal_id=proposal.id, text=f"Tight completion timeline of {project.time_hours} hours for {project.team_size} members.", severity="medium", mitigation="Strictly prioritize MVP tasks 1-5 and defer stretch goals."),
             ]
             for r in risks:
                 session.add(r)

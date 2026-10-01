@@ -6,12 +6,104 @@ from app.llm.base import LLMMessage, LLMOutputError, LLMProvider, LLMResult
 T = TypeVar("T", bound=BaseModel)
 
 
+DEFAULT_MOCK_RESPONSES: Dict[str, Any] = {
+    "RequirementAnalysisOutput": {
+        "requirements": [
+            {
+                "text": "Early detection and classification of crop pathology using vision models",
+                "source_span": "Build an AI system for early detection of crop diseases",
+                "priority": "high",
+            },
+            {
+                "text": "Support inference in low-resource and edge environments",
+                "source_span": "low-resource environments",
+                "priority": "high",
+            },
+        ],
+        "constraints": [
+            {
+                "text": "Project must fit within the 36-hour team time budget",
+                "source_span": "36 hours",
+                "severity": "warning",
+            },
+            {
+                "text": "Compute constrained to single GPU / edge hardware",
+                "source_span": "Limited GPU",
+                "severity": "warning",
+            },
+            {
+                "text": "All code and deliverables must be released under an OSI-approved open source license",
+                "source_span": "open source",
+                "severity": "info",
+            },
+        ],
+        "deliverables": [
+            {
+                "text": "Working repository with documented installation and model inference scripts",
+                "source_span": None,
+            },
+            {
+                "text": "Evidence-backed architecture document and MVP demo",
+                "source_span": None,
+            },
+        ],
+        "judging_criteria": [
+            {
+                "text": "Technical depth and demonstrable feasibility within stated constraints",
+                "source_span": "judging criteria",
+            },
+            {
+                "text": "Evidence traceability from academic papers and open-source models",
+                "source_span": None,
+            },
+        ],
+    },
+    "ResearchPlannerOutput": {
+        "questions": [
+            {
+                "id": "RQ1",
+                "question": "What are the established lightweight computer vision architectures (CNNs, MobileNets, ViTs) for crop disease classification?",
+                "priority": "high",
+                "coverage_area": "existing_approaches",
+            },
+            {
+                "id": "RQ2",
+                "question": "What open benchmark datasets (e.g. PlantVillage, Cassava) are available with permissive licenses?",
+                "priority": "high",
+                "coverage_area": "datasets_and_benchmarks",
+            },
+            {
+                "id": "RQ3",
+                "question": "What open-source repositories provide battle-tested pretrained weights for plant leaf pathology?",
+                "priority": "medium",
+                "coverage_area": "open_source_repos",
+            },
+            {
+                "id": "RQ4",
+                "question": "What model quantization techniques (ONNX, TensorRT, INT8) best fit the team's hardware and latency constraints?",
+                "priority": "medium",
+                "coverage_area": "feasibility_and_tradeoffs",
+            },
+            {
+                "id": "RQ5",
+                "question": "What limitations in field-generalization and lighting robustness present viable differentiation opportunities?",
+                "priority": "high",
+                "coverage_area": "potential_gaps",
+            },
+        ]
+    },
+}
+
+
 class MockProvider(LLMProvider):
     name: str = "mock"
     model: str = "qwen3:8b-mock"
 
     def __init__(self, canned_responses: Optional[Dict[str, Any]] = None):
-        self.canned_responses = canned_responses or {}
+        merged = dict(DEFAULT_MOCK_RESPONSES)
+        if canned_responses:
+            merged.update(canned_responses)
+        self.canned_responses = merged
 
     async def chat(
         self,

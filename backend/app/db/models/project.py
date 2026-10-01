@@ -33,3 +33,15 @@ class Project(Base):
     )
 
     user = relationship("User", back_populates="projects")
+    requirements = relationship(
+        "Requirement",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="Requirement.position",
+    )
+    research_questions = relationship(
+        "ResearchQuestion",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ResearchQuestion.position",
+    )

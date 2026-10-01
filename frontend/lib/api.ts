@@ -18,6 +18,30 @@ export interface DebugLLMResponse {
   latency_ms: number;
 }
 
+export interface Requirement {
+  id: string;
+  project_id: string;
+  kind: "requirement" | "constraint" | "deliverable" | "judging_criterion";
+  text: str;
+  source_span?: string | null;
+  priority?: string | null;
+  severity?: string | null;
+  user_edited: boolean;
+  position: number;
+}
+
+type str = string;
+
+export interface ResearchQuestion {
+  id: string;
+  project_id: string;
+  label: string;
+  question: string;
+  priority: "high" | "medium" | "low";
+  status: string;
+  position: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -32,6 +56,11 @@ export interface Project {
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProjectDetail extends Project {
+  requirements: Requirement[];
+  research_questions: ResearchQuestion[];
 }
 
 export interface ProjectCreate {
@@ -81,6 +110,14 @@ export async function fetchProjects(): Promise<Project[]> {
   return res.json();
 }
 
+export async function getProject(id: string): Promise<ProjectDetail> {
+  const res = await fetch(`${API_BASE_URL}/projects/${id}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Failed to get project: ${res.statusText}`);
+  }
+  return res.json();
+}
+
 export async function createProject(data: ProjectCreate): Promise<Project> {
   const res = await fetch(`${API_BASE_URL}/projects`, {
     method: "POST",
@@ -92,6 +129,57 @@ export async function createProject(data: ProjectCreate): Promise<Project> {
     throw new Error(
       errorData?.error?.message || `Failed to create project: ${res.statusText}`
     );
+  }
+  return res.json();
+}
+
+export async function analyzeProject(id: string): Promise<ProjectDetail> {
+  const res = await fetch(`${API_BASE_URL}/projects/${id}/analyze`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData?.error?.message || `Failed to analyze project: ${res.statusText}`
+    );
+  }
+  return res.json();
+}
+
+export async function updateRequirement(
+  projectId: string,
+  reqId: string,
+  data: Partial<Requirement>
+): Promise<Requirement> {
+  const res = await fetch(
+    `${API_BASE_URL}/projects/${projectId}/requirements/${reqId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }
+  );
+  if (!res.ok) {
+    throw new Error("Failed to update requirement");
+  }
+  return res.json();
+}
+
+export async function updateQuestion(
+  projectId: string,
+  qId: string,
+  data: Partial<ResearchQuestion>
+): Promise<ResearchQuestion> {
+  const res = await fetch(
+    `${API_BASE_URL}/projects/${projectId}/questions/${qId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }
+  );
+  if (!res.ok) {
+    throw new Error("Failed to update research question");
   }
   return res.json();
 }

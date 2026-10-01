@@ -45,3 +45,12 @@ class ProjectResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+from app.schemas.requirement import RequirementResponse
+from app.schemas.research_question import ResearchQuestionResponse
+
+
+class ProjectDetailResponse(ProjectResponse):
+    requirements: List[RequirementResponse] = []
+    research_questions: List[ResearchQuestionResponse] = []

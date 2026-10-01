@@ -45,3 +45,13 @@ class Project(Base):
         cascade="all, delete-orphan",
         order_by="ResearchQuestion.position",
     )
+    research_runs = relationship(
+        "ResearchRun",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    sources = relationship(
+        "Source",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )

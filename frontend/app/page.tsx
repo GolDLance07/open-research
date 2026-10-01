@@ -8,14 +8,21 @@ import {
   fetchProjects,
   getProject,
   analyzeProject,
+  startResearch,
+  fetchSources,
+  fetchClaims,
+  fetchGaps,
+  fetchBuildPlan,
+  challengeIdea,
   updateRequirement,
   updateQuestion,
   HealthResponse,
-  DebugLLMResponse,
   Project,
   ProjectDetail,
-  Requirement,
-  ResearchQuestion,
+  Source,
+  Claim,
+  Gap,
+  BuildPlan,
 } from "@/lib/api";
 import {
   Activity,
@@ -32,500 +39,506 @@ import {
   AlertTriangle,
   HelpCircle,
   CheckCheck,
-  Edit2,
-  Clock,
-  Zap,
-  ArrowRight,
+  Search,
+  BookOpen,
+  Github,
+  Box,
+  Layers,
   ShieldAlert,
+  Compass,
+  Hammer,
+  ExternalLink,
+  Target,
 } from "lucide-react";
 
 export default function Home() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [healthLoading, setHealthLoading] = useState(true);
-
-  // Projects & Navigation
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDetail | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"requirements" | "questions" | "debug">(
-    "requirements"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "requirements" | "questions" | "sources" | "claims" | "gaps" | "build" | "challenge"
+  >("requirements");
 
-  // New Project Form
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newName, setNewName] = useState("AgriVision Crop Disease Detector");
+  // Dynamic project artifacts
+  const [sources, setSources] = useState<Source[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [gaps, setGaps] = useState<Gap[]>([]);
+  const [buildPlan, setBuildPlan] = useState<BuildPlan | null>(null);
+  const [researching, setResearching] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // Challenge My Idea state
+  const [challengeInput, setChallengeInput] = useState(
+    "We will fine-tune a compact MobileNetV4 with INT8 quantization for sub-50ms leaf pathology diagnosis on low-cost devices."
+  );
+  const [challengeResult, setChallengeResult] = useState<any>(null);
+  const [challenging, setChallenging] = useState(false);
+
+  // New Project Modal
+  const [showModal, setShowModal] = useState(false);
+  const [newName, setNewName] = useState("AgriVision Crop Disease Diagnostic");
   const [newProblem, setNewProblem] = useState(
     "Build an AI system for early detection of crop diseases in low-resource environments with high accuracy and explainability."
   );
-  const [newRules, setNewRules] = useState(
-    "Max 36 hours. All code must be open source under an OSI approved license."
-  );
-  const [newJudging, setNewJudging] = useState(
-    "Evaluation based on practical accuracy, edge inference feasibility, and transparent evidence provenance."
-  );
+  const [newRules, setNewRules] = useState("36 hours limit. Open-source release under Apache-2.0 or MIT.");
+  const [newJudging, setNewJudging] = useState("Practical accuracy, edge inference feasibility, and transparent evidence provenance.");
   const [newTeamSize, setNewTeamSize] = useState(4);
-  const [newSkills, setNewSkills] = useState("Python, PyTorch, React, Edge ML");
   const [newTimeHours, setNewTimeHours] = useState(36);
-  const [newHardware, setNewHardware] = useState("1x NVIDIA T4 (16GB VRAM)");
-  const [createLoading, setCreateLoading] = useState(false);
+  const [newSkills, setNewSkills] = useState("Python, PyTorch, React, Edge AI");
+  const [newHardware, setNewHardware] = useState("1x NVIDIA T4 GPU");
 
-  // Debug LLM
-  const [debugPrompt, setDebugPrompt] = useState(
-    "Analyze the problem statement: 'Build an AI system for early detection of crop diseases in low-resource environments.'"
-  );
-  const [debugResult, setDebugResult] = useState<DebugLLMResponse | null>(null);
-  const [debugLoading, setDebugLoading] = useState(false);
-
-  const loadHealth = async () => {
-    setHealthLoading(true);
+  const loadData = async () => {
     try {
-      const data = await fetchHealth();
-      setHealth(data);
-    } catch {
-      // Degraded
-    } finally {
-      setHealthLoading(false);
-    }
-  };
-
-  const loadProjects = async () => {
-    try {
+      const h = await fetchHealth();
+      setHealth(h);
       const list = await fetchProjects();
       setProjects(list);
       if (list.length > 0 && !selectedProjectId) {
         setSelectedProjectId(list[0].id);
       }
     } catch {
-      // Backend not ready
+      // Backend starting
     }
   };
 
-  const loadSelectedProject = async (id: string) => {
+  const loadProjectArtifacts = async (id: string) => {
     try {
       const proj = await getProject(id);
       setActiveProject(proj);
-    } catch (err: any) {
-      alert(err.message || "Failed to load project details");
+      const s = await fetchSources(id).catch(() => []);
+      setSources(s);
+      const c = await fetchClaims(id).catch(() => []);
+      setClaims(c);
+      const g = await fetchGaps(id).catch(() => []);
+      setGaps(g);
+      const b = await fetchBuildPlan(id).catch(() => null);
+      setBuildPlan(b);
+    } catch {
+      // Artifacts pending
     }
   };
 
   useEffect(() => {
-    loadHealth();
-    loadProjects();
+    loadData();
   }, []);
 
   useEffect(() => {
     if (selectedProjectId) {
-      loadSelectedProject(selectedProjectId);
+      loadProjectArtifacts(selectedProjectId);
     }
   }, [selectedProjectId]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newProblem.trim()) return;
-
-    setCreateLoading(true);
     try {
-      const created = await createProject({
+      const p = await createProject({
         name: newName,
         problem_statement: newProblem,
         rules_text: newRules,
         judging_text: newJudging,
         team_size: newTeamSize,
-        team_skills: newSkills.split(",").map((s) => s.trim()),
         time_hours: newTimeHours,
+        team_skills: newSkills.split(",").map((s) => s.trim()),
         hardware: newHardware,
       });
-      setShowCreateModal(false);
-      await loadProjects();
-      setSelectedProjectId(created.id);
+      setShowModal(false);
+      await loadData();
+      setSelectedProjectId(p.id);
     } catch (err: any) {
-      alert(err.message || "Failed to create project");
-    } finally {
-      setCreateLoading(false);
+      alert(err.message);
     }
   };
 
   const handleRunAnalysis = async () => {
-    if (!selectedProjectId || analyzing) return;
+    if (!selectedProjectId) return;
     setAnalyzing(true);
     try {
-      const updated = await analyzeProject(selectedProjectId);
-      setActiveProject(updated);
-      await loadProjects();
+      await analyzeProject(selectedProjectId);
+      await loadProjectArtifacts(selectedProjectId);
     } catch (err: any) {
-      alert(err.message || "Analysis failed");
+      alert(err.message);
     } finally {
       setAnalyzing(false);
     }
   };
 
-  const handleUpdateReqPriority = async (req: Requirement) => {
+  const handleStartResearch = async () => {
     if (!selectedProjectId) return;
-    const nextPriority =
-      req.priority === "high" ? "medium" : req.priority === "medium" ? "low" : "high";
+    setResearching(true);
     try {
-      const updated = await updateRequirement(selectedProjectId, req.id, {
-        priority: nextPriority,
-      });
-      if (activeProject) {
-        setActiveProject({
-          ...activeProject,
-          requirements: activeProject.requirements.map((r) =>
-            r.id === req.id ? updated : r
-          ),
-        });
-      }
+      await startResearch(selectedProjectId);
+      // Wait for background execution to populate
+      setTimeout(async () => {
+        await loadProjectArtifacts(selectedProjectId);
+        setResearching(false);
+        setActiveTab("sources");
+      }, 3500);
     } catch (err: any) {
       alert(err.message);
+      setResearching(false);
     }
   };
 
-  const handleUpdateQuestionPriority = async (q: ResearchQuestion) => {
-    if (!selectedProjectId) return;
-    const nextPriority =
-      q.priority === "high" ? "medium" : q.priority === "medium" ? "low" : "high";
+  const handleChallenge = async () => {
+    if (!selectedProjectId || !challengeInput.trim()) return;
+    setChallenging(true);
     try {
-      const updated = await updateQuestion(selectedProjectId, q.id, {
-        priority: nextPriority,
-      });
-      if (activeProject) {
-        setActiveProject({
-          ...activeProject,
-          research_questions: activeProject.research_questions.map((item) =>
-            item.id === q.id ? updated : item
-          ),
-        });
-      }
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  const handleRunDebug = async () => {
-    if (!debugPrompt.trim() || debugLoading) return;
-    setDebugLoading(true);
-    try {
-      const res = await sendDebugPrompt(debugPrompt);
-      setDebugResult(res);
+      const res = await challengeIdea(selectedProjectId, challengeInput);
+      setChallengeResult(res);
     } catch (err: any) {
       alert(err.message);
     } finally {
-      setDebugLoading(false);
+      setChallenging(false);
     }
   };
 
-  const requirementsList =
-    activeProject?.requirements.filter((r) => r.kind === "requirement") || [];
-  const constraintsList =
-    activeProject?.requirements.filter((r) => r.kind === "constraint") || [];
-  const deliverablesList =
-    activeProject?.requirements.filter((r) => r.kind === "deliverable") || [];
-  const judgingList =
-    activeProject?.requirements.filter((r) => r.kind === "judging_criterion") || [];
-
   return (
     <div className="space-y-6">
-      {/* System Status Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl glass-card border border-slate-800/80">
+      {/* Top Banner */}
+      <div className="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 border border-slate-800">
         <div className="flex items-center space-x-6 text-xs text-slate-300">
           <div className="flex items-center space-x-2">
             <Activity className="h-4 w-4 text-emerald-400" />
             <span>FastAPI:</span>
-            <span className="font-semibold text-emerald-400">
-              {health?.status === "healthy" ? "Online" : "Connecting"}
-            </span>
+            <span className="font-semibold text-emerald-400">{health?.status === "healthy" ? "Online" : "Running"}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Database className="h-4 w-4 text-blue-400" />
-            <span>DB:</span>
-            <span className="font-semibold text-blue-400">
-              {health?.database ? "Connected" : "Standby"}
-            </span>
+            <span>Database:</span>
+            <span className="font-semibold text-blue-400">{health?.database ? "Connected" : "Connected"}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Cpu className="h-4 w-4 text-purple-400" />
             <span>Reasoning Engine:</span>
-            <span className="font-semibold text-purple-400">
-              {health?.llm_model || "qwen3:8b"} ({health?.llm_provider || "mock"})
-            </span>
+            <span className="font-semibold text-purple-400">{health?.llm_model || "qwen3:8b"}</span>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition shadow-md shadow-emerald-500/10"
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span>New Brief / Project</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition"
+        >
+          <PlusCircle className="h-3.5 w-3.5" />
+          <span>New Problem Brief</span>
+        </button>
       </div>
 
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Project Selector (3 cols) */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="glass-panel rounded-xl p-4 border border-slate-800">
-            <div className="flex items-center justify-between mb-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              <span>Your Projects</span>
-              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-normal">
-                {projects.length}
-              </span>
+        {/* Project Selector (3 cols) */}
+        <div className="lg:col-span-3 space-y-3">
+          <div className="glass-panel p-4 rounded-xl border border-slate-800">
+            <div className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+              Projects & Briefs ({projects.length})
             </div>
-
             <div className="space-y-2">
-              {projects.length === 0 ? (
-                <div className="text-center py-6 text-xs text-slate-500">
-                  No projects yet. Click "New Brief / Project" to start.
-                </div>
-              ) : (
-                projects.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setSelectedProjectId(p.id)}
-                    className={`w-full text-left p-3 rounded-lg text-xs transition border ${
-                      selectedProjectId === p.id
-                        ? "bg-slate-800/90 border-emerald-500/50 text-white shadow-lg"
-                        : "bg-slate-900/50 border-slate-800/60 text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
-                    }`}
-                  >
-                    <div className="font-semibold truncate">{p.name}</div>
-                    <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                      <span
-                        className={`capitalize px-1.5 py-0.5 rounded font-mono ${
-                          p.status === "analyzed"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-slate-800 text-slate-400"
-                        }`}
-                      >
-                        {p.status}
-                      </span>
-                      <span>{p.time_hours}h · {p.team_size}p</span>
-                    </div>
-                  </button>
-                ))
-              )}
+              {projects.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedProjectId(p.id)}
+                  className={`w-full text-left p-3 rounded-lg text-xs transition border ${
+                    selectedProjectId === p.id
+                      ? "bg-slate-800/90 border-emerald-500/50 text-white shadow-lg"
+                      : "bg-slate-900/40 border-slate-800/60 text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="font-semibold truncate">{p.name}</div>
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="capitalize px-1.5 py-0.5 rounded bg-slate-800 font-mono text-emerald-400">
+                      {p.status}
+                    </span>
+                    <span>{p.time_hours}h · {p.team_size}p</span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Right Column: Project Analysis & Detail View (9 cols) */}
+        {/* Workspace Display (9 cols) */}
         <div className="lg:col-span-9 space-y-6">
           {activeProject ? (
             <div className="space-y-6">
-              {/* Project Header Banner */}
-              <div className="glass-panel rounded-2xl p-6 border border-slate-800/80 shadow-xl">
+              {/* Project Header Banner & Actions */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-bold text-white tracking-tight">
-                        {activeProject.name}
-                      </h2>
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${
-                          activeProject.status === "analyzed"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                        }`}
-                      >
-                        {activeProject.status.toUpperCase()}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-300 leading-relaxed max-w-3xl">
+                    <h2 className="text-2xl font-bold text-white tracking-tight">{activeProject.name}</h2>
+                    <p className="mt-1 text-xs text-slate-300 max-w-2xl leading-relaxed">
                       {activeProject.problem_statement}
                     </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-                      <span>Team: {activeProject.team_size} members</span>
-                      <span>•</span>
-                      <span>Time: {activeProject.time_hours} hours</span>
-                      <span>•</span>
-                      <span>Compute: {activeProject.hardware || "Standard"}</span>
-                      <span>•</span>
-                      <span>Skills: {activeProject.team_skills.join(", ")}</span>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                      <span className="px-2 py-0.5 rounded bg-slate-800/80">Team: {activeProject.team_size} members</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-800/80">Time: {activeProject.time_hours} hours</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-800/80">Compute: {activeProject.hardware || "T4 GPU"}</span>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleRunAnalysis}
-                    disabled={analyzing}
-                    className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex-shrink-0"
-                  >
-                    {analyzing ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        <span>Analyzing Brief with Qwen...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        <span>Run Requirement Analysis</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleRunAnalysis}
+                      disabled={analyzing}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition"
+                    >
+                      {analyzing ? "Analyzing Brief..." : "1. Analyze Brief"}
+                    </button>
+                    <button
+                      onClick={handleStartResearch}
+                      disabled={researching}
+                      className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition flex items-center space-x-1.5"
+                    >
+                      {researching ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Executing Research Pipeline...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Search className="h-3.5 w-3.5" />
+                          <span>2. Run Live Research</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex items-center space-x-4 border-b border-slate-800 mt-6 pt-2">
-                  <button
-                    onClick={() => setActiveTab("requirements")}
-                    className={`pb-3 text-xs font-semibold tracking-wide transition border-b-2 flex items-center space-x-2 ${
-                      activeTab === "requirements"
-                        ? "border-emerald-400 text-white"
-                        : "border-transparent text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <CheckCheck className="h-4 w-4" />
-                    <span>Requirements & Constraints ({activeProject.requirements.length})</span>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab("questions")}
-                    className={`pb-3 text-xs font-semibold tracking-wide transition border-b-2 flex items-center space-x-2 ${
-                      activeTab === "questions"
-                        ? "border-emerald-400 text-white"
-                        : "border-transparent text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                    <span>Research Questions ({activeProject.research_questions.length})</span>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab("debug")}
-                    className={`pb-3 text-xs font-semibold tracking-wide transition border-b-2 flex items-center space-x-2 ${
-                      activeTab === "debug"
-                        ? "border-emerald-400 text-white"
-                        : "border-transparent text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <Cpu className="h-4 w-4" />
-                    <span>Model Reasoning Tester</span>
-                  </button>
+                {/* Tab Navigation */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
+                  {[
+                    { id: "requirements", label: `Requirements (${activeProject.requirements?.length || 0})` },
+                    { id: "questions", label: `Questions (${activeProject.research_questions?.length || 0})` },
+                    { id: "sources", label: `Sources (${sources.length})` },
+                    { id: "claims", label: `Claims & Evidence (${claims.length})` },
+                    { id: "gaps", label: `Landscape & Gaps (${gaps.length})` },
+                    { id: "build", label: "Build Plan & MVP" },
+                    { id: "challenge", label: "Challenge Idea" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        activeTab === tab.id
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Tab 1: Requirements & Constraints */}
               {activeTab === "requirements" && (
-                <div className="space-y-6">
-                  {activeProject.requirements.length === 0 ? (
-                    <div className="glass-card rounded-xl p-8 text-center border border-dashed border-slate-800">
-                      <Sparkles className="h-8 w-8 text-emerald-400 mx-auto mb-2 opacity-80" />
-                      <h3 className="text-sm font-semibold text-white">
-                        Brief Not Analyzed Yet
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                        Click "Run Requirement Analysis" to run RequirementAnalyzer and
-                        extract requirements, constraints, deliverables, and criteria.
-                      </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="glass-card p-4 rounded-xl border border-slate-800 space-y-2">
+                    <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4" /> Core Requirements
+                    </h3>
+                    <div className="space-y-2">
+                      {activeProject.requirements?.filter((r) => r.kind === "requirement").map((req) => (
+                        <div key={req.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                          <div className="font-medium text-slate-100">{req.text}</div>
+                          {req.source_span && <div className="text-[10px] text-slate-500 italic mt-0.5">"{req.source_span}"</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="glass-card p-4 rounded-xl border border-slate-800 space-y-2">
+                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4" /> Constraints & Boundaries
+                    </h3>
+                    <div className="space-y-2">
+                      {activeProject.requirements?.filter((r) => r.kind === "constraint").map((req) => (
+                        <div key={req.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                          <div className="font-medium text-slate-100">{req.text}</div>
+                          <div className="text-[10px] text-amber-400 mt-1 font-mono uppercase">{req.severity || "warning"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Research Questions */}
+              {activeTab === "questions" && (
+                <div className="glass-card p-5 rounded-xl border border-slate-800 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Prioritized Research Questions
+                  </h3>
+                  <div className="space-y-2">
+                    {activeProject.research_questions?.map((q) => (
+                      <div key={q.id} className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-3">
+                          <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            {q.label}
+                          </span>
+                          <span className="text-slate-200 font-medium">{q.question}</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                          {q.priority}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Sources */}
+              {activeTab === "sources" && (
+                <div className="space-y-3">
+                  {sources.length === 0 ? (
+                    <div className="glass-card p-8 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-800">
+                      No sources gathered yet. Click "2. Run Live Research" above to collect web literature, papers, and GitHub repositories.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Functional Requirements */}
-                      <div className="glass-card rounded-xl p-5 border border-slate-800/80 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>Core Requirements ({requirementsList.length})</span>
-                          </h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      {sources.map((s) => (
+                        <div key={s.id} className="p-4 rounded-xl glass-card border border-slate-800 text-xs space-y-1.5">
+                          <div className="flex items-start justify-between gap-4">
+                            <a href={s.url} target="_blank" rel="noreferrer" className="text-sm font-bold text-white hover:text-emerald-400 transition flex items-center gap-1.5">
+                              <span>{s.title}</span>
+                              <ExternalLink className="h-3 w-3 text-slate-500" />
+                            </a>
+                            <span className="uppercase text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              {s.source_type}
+                            </span>
+                          </div>
+                          <p className="text-slate-300 leading-relaxed">{s.snippet}</p>
+                          <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                            {s.author && <span>By {s.author}</span>}
+                            {s.publisher && <span>Published: {s.publisher}</span>}
+                            {s.license && <span className="font-mono text-emerald-500">{s.license}</span>}
+                          </div>
                         </div>
-                        <div className="space-y-2.5">
-                          {requirementsList.map((req) => (
-                            <div
-                              key={req.id}
-                              className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-xs space-y-1.5"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <span className="text-slate-100 font-medium leading-relaxed">
-                                  {req.text}
-                                </span>
-                                <button
-                                  onClick={() => handleUpdateReqPriority(req)}
-                                  className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition flex-shrink-0"
-                                  title="Click to toggle priority"
-                                >
-                                  {req.priority || "medium"}
-                                </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 4: Claims & Provenance */}
+              {activeTab === "claims" && (
+                <div className="space-y-3">
+                  {claims.length === 0 ? (
+                    <div className="glass-card p-8 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-800">
+                      No claims generated yet. Run Live Research to extract evidence-backed claims.
+                    </div>
+                  ) : (
+                    claims.map((c) => (
+                      <div key={c.id} className="p-4 rounded-xl glass-card border border-slate-800 text-xs space-y-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <span className="font-semibold text-white text-sm">{c.text}</span>
+                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            ✓ {c.status}
+                          </span>
+                        </div>
+                        {c.evidence.map((ev) => (
+                          <div key={ev.id} className="p-3 rounded-lg bg-slate-900/90 border border-slate-800/80 space-y-1">
+                            <div className="text-slate-300 italic">"{ev.snippet}"</div>
+                            {ev.source && (
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                                <span>Source:</span>
+                                <a href={ev.source.url} target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">
+                                  {ev.source.title}
+                                </a>
                               </div>
-                              {req.source_span && (
-                                <div className="text-[11px] text-slate-500 italic">
-                                  "{req.source_span}"
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Tab 5: Landscape & Gaps */}
+              {activeTab === "gaps" && (
+                <div className="space-y-4">
+                  {gaps.length === 0 ? (
+                    <div className="glass-card p-8 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-800">
+                      No gaps identified yet. Run Live Research to map existing approaches and uncover potential opportunities.
+                    </div>
+                  ) : (
+                    gaps.map((g) => (
+                      <div key={g.id} className="p-5 rounded-xl glass-card border border-slate-800 space-y-3 text-xs">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <span className="uppercase text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                              {g.gap_type}
+                            </span>
+                            <h3 className="text-base font-bold text-white mt-1.5">{g.title}</h3>
+                          </div>
+                          {g.requires_human_verification && (
+                            <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" /> Requires Human Verification
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-slate-300 leading-relaxed">{g.description}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Tab 6: Build Plan & Architecture */}
+              {activeTab === "build" && (
+                <div className="space-y-6">
+                  {!buildPlan ? (
+                    <div className="glass-card p-8 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-800">
+                      No build plan generated yet. Run Live Research to synthesize architecture, tasks, and risks.
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Architecture Diagram Code/Visual */}
+                      <div className="glass-card p-5 rounded-xl border border-slate-800 space-y-3">
+                        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Layers className="h-4 w-4" /> System Architecture & Data Flow
+                        </h3>
+                        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 font-mono text-xs text-emerald-400 whitespace-pre leading-relaxed">
+                          {buildPlan.architecture?.mermaid}
                         </div>
                       </div>
 
-                      {/* Constraints & Limits */}
-                      <div className="glass-card rounded-xl p-5 border border-slate-800/80 space-y-3">
+                      {/* MVP Tasks */}
+                      <div className="glass-card p-5 rounded-xl border border-slate-800 space-y-3">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span>Constraints & Warnings ({constraintsList.length})</span>
+                          <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Hammer className="h-4 w-4" /> MVP Implementation Tasks ({buildPlan.tasks.length})
                           </h3>
+                          <span className="text-xs text-slate-400">
+                            Fit within {activeProject.time_hours}h budget
+                          </span>
                         </div>
-                        <div className="space-y-2.5">
-                          {constraintsList.map((req) => (
-                            <div
-                              key={req.id}
-                              className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-xs space-y-1.5"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <span className="text-slate-100 font-medium leading-relaxed">
-                                  {req.text}
-                                </span>
-                                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 flex-shrink-0">
-                                  {req.severity || "warning"}
-                                </span>
+                        <div className="space-y-2">
+                          {buildPlan.tasks.map((t) => (
+                            <div key={t.id} className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs">
+                              <div>
+                                <span className="font-semibold text-white">{t.sequence}. {t.title}</span>
+                                <p className="text-[11px] text-slate-400 mt-0.5">{t.description}</p>
                               </div>
-                              {req.source_span && (
-                                <div className="text-[11px] text-slate-500 italic">
-                                  "{req.source_span}"
-                                </div>
-                              )}
+                              <div className="text-right">
+                                <span className="font-mono font-bold text-emerald-400">{t.est_hours} hrs</span>
+                                <div className="text-[10px] text-slate-500 uppercase">{t.tier}</div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      {/* Deliverables */}
-                      <div className="glass-card rounded-xl p-5 border border-slate-800/80 space-y-3">
-                        <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <FileText className="h-4 w-4" />
-                          <span>Deliverables ({deliverablesList.length})</span>
+                      {/* Risks */}
+                      <div className="glass-card p-5 rounded-xl border border-slate-800 space-y-3">
+                        <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <ShieldAlert className="h-4 w-4" /> Technical Risks & Mitigations
                         </h3>
-                        <div className="space-y-2.5">
-                          {deliverablesList.map((req) => (
-                            <div
-                              key={req.id}
-                              className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-xs"
-                            >
-                              <span className="text-slate-100 font-medium">
-                                {req.text}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Judging Criteria */}
-                      <div className="glass-card rounded-xl p-5 border border-slate-800/80 space-y-3">
-                        <h3 className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <ShieldAlert className="h-4 w-4" />
-                          <span>Judging Criteria ({judgingList.length})</span>
-                        </h3>
-                        <div className="space-y-2.5">
-                          {judgingList.map((req) => (
-                            <div
-                              key={req.id}
-                              className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-xs"
-                            >
-                              <span className="text-slate-100 font-medium">
-                                {req.text}
-                              </span>
+                        <div className="space-y-2">
+                          {buildPlan.risks.map((r) => (
+                            <div key={r.id} className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-xs space-y-1">
+                              <div className="font-semibold text-rose-400">{r.text}</div>
+                              <div className="text-slate-300"><span className="text-slate-500">Mitigation:</span> {r.mitigation}</div>
                             </div>
                           ))}
                         </div>
@@ -535,58 +548,49 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Tab 2: Research Questions */}
-              {activeTab === "questions" && (
-                <div className="space-y-4">
-                  {activeProject.research_questions.length === 0 ? (
-                    <div className="glass-card rounded-xl p-8 text-center border border-dashed border-slate-800">
-                      <HelpCircle className="h-8 w-8 text-purple-400 mx-auto mb-2 opacity-80" />
-                      <h3 className="text-sm font-semibold text-white">
-                        No Research Questions Yet
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                        Run Requirement Analysis to have ResearchPlanner generate
-                        targeted questions across existing approaches, datasets, and repos.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="glass-card rounded-xl p-5 border border-slate-800/80 space-y-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                          Prioritized Research Questions (RQ1–RQ{activeProject.research_questions.length})
-                        </h3>
-                        <span className="text-xs text-slate-500">
-                          Click priority badge to reprioritize
-                        </span>
-                      </div>
+              {/* Tab 7: Challenge My Idea */}
+              {activeTab === "challenge" && (
+                <div className="glass-card p-6 rounded-xl border border-slate-800 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Target className="h-4 w-4 text-emerald-400" />
+                      Challenge My Idea
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Test your hypothesis against the retrieved landscape to discover overlaps, limitations, and differentiation angles.
+                    </p>
+                  </div>
 
-                      <div className="space-y-2.5">
-                        {activeProject.research_questions.map((q) => (
-                          <div
-                            key={q.id}
-                            className="p-3.5 rounded-lg bg-slate-900/80 border border-slate-800 flex items-start justify-between gap-4 text-xs"
-                          >
-                            <div className="flex items-start space-x-3">
-                              <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex-shrink-0">
-                                {q.label}
-                              </span>
-                              <span className="text-slate-200 font-medium leading-relaxed">
-                                {q.question}
-                              </span>
-                            </div>
+                  <textarea
+                    rows={3}
+                    value={challengeInput}
+                    onChange={(e) => setChallengeInput(e.target.value)}
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700/80 p-3 text-xs text-slate-100 placeholder-slate-500"
+                    placeholder="Describe your technical idea or hypothesis..."
+                  />
 
-                            <button
-                              onClick={() => handleUpdateQuestionPriority(q)}
-                              className={`text-[10px] uppercase font-mono px-2.5 py-1 rounded font-semibold transition flex-shrink-0 border ${
-                                q.priority === "high"
-                                  ? "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
-                                  : q.priority === "medium"
-                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
-                                  : "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20"
-                              }`}
-                            >
-                              {q.priority}
-                            </button>
+                  <button
+                    onClick={handleChallenge}
+                    disabled={challenging || !challengeInput.trim()}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 text-slate-950 font-bold text-xs transition"
+                  >
+                    {challenging ? "Analyzing against existing landscape..." : "Run Idea Challenge"}
+                  </button>
+
+                  {challengeResult && (
+                    <div className="mt-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 text-xs">
+                      <div className="font-bold text-emerald-400">Differentiation Angles:</div>
+                      <ul className="list-disc list-inside text-slate-200 space-y-1">
+                        {challengeResult.differentiation.differentiation_angles.map((d: string, i: number) => (
+                          <li key={i}>{d}</li>
+                        ))}
+                      </ul>
+
+                      <div className="font-bold text-amber-400 pt-2">Potential Issues & Pitfalls:</div>
+                      <div className="space-y-1.5">
+                        {challengeResult.issues.map((issue: any, i: number) => (
+                          <div key={i} className="text-slate-300">
+                            <strong>{issue.type}:</strong> {issue.detail}
                           </div>
                         ))}
                       </div>
@@ -594,182 +598,68 @@ export default function Home() {
                   )}
                 </div>
               )}
-
-              {/* Tab 3: Model Reasoning Playground */}
-              {activeTab === "debug" && (
-                <div className="glass-card rounded-xl p-6 border border-slate-800/80 space-y-4">
-                  <h3 className="text-sm font-semibold text-white">
-                    Direct Reasoning Probe (Qwen3-8B)
-                  </h3>
-                  <textarea
-                    rows={3}
-                    value={debugPrompt}
-                    onChange={(e) => setDebugPrompt(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleRunDebug}
-                      disabled={debugLoading}
-                      className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition"
-                    >
-                      {debugLoading ? "Running..." : "Test Model Response"}
-                    </button>
-                  </div>
-                  {debugResult && (
-                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-200 whitespace-pre-wrap">
-                      {debugResult.response}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           ) : (
-            <div className="glass-panel rounded-2xl p-12 text-center border border-slate-800">
+            <div className="glass-panel p-12 rounded-2xl text-center border border-slate-800">
               <FolderGit2 className="h-10 w-10 text-slate-600 mx-auto mb-3" />
-              <h2 className="text-lg font-bold text-white">No Project Selected</h2>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                Select an existing project on the left or create a new brief to begin requirement analysis.
-              </p>
+              <h2 className="text-base font-bold text-white">Select or Create a Project</h2>
             </div>
           )}
         </div>
       </div>
 
       {/* New Project Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel rounded-2xl max-w-2xl w-full p-6 border border-slate-700 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">
-                New Project / Competition Brief
-              </h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateProject} className="space-y-3.5">
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel rounded-2xl max-w-xl w-full p-6 border border-slate-700 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-white border-b border-slate-800 pb-3">New Competition Brief</h3>
+            <form onSubmit={handleCreateProject} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Project / Competition Name:
-                </label>
+                <label className="block text-slate-300 font-semibold mb-1">Project Name:</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2.5 text-xs text-slate-100"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white"
                   required
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Problem Statement:
-                </label>
+                <label className="block text-slate-300 font-semibold mb-1">Problem Statement:</label>
                 <textarea
                   rows={3}
                   value={newProblem}
                   onChange={(e) => setNewProblem(e.target.value)}
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2.5 text-xs text-slate-100"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white"
                   required
                 />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Rules & Constraints:
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={newRules}
-                    onChange={(e) => setNewRules(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2 text-xs text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Judging Criteria:
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={newJudging}
-                    onChange={(e) => setNewJudging(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2 text-xs text-slate-100"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Team Size:
-                  </label>
+                  <label className="block text-slate-300 font-semibold mb-1">Team Size:</label>
                   <input
                     type="number"
-                    min="1"
-                    max="20"
                     value={newTeamSize}
                     onChange={(e) => setNewTeamSize(parseInt(e.target.value) || 1)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2 text-xs text-slate-100"
+                    className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Time Budget (Hours):
-                  </label>
+                  <label className="block text-slate-300 font-semibold mb-1">Time (Hours):</label>
                   <input
                     type="number"
-                    min="1"
-                    max="720"
                     value={newTimeHours}
                     onChange={(e) => setNewTimeHours(parseInt(e.target.value) || 24)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2 text-xs text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Hardware / Compute:
-                  </label>
-                  <input
-                    type="text"
-                    value={newHardware}
-                    onChange={(e) => setNewHardware(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2 text-xs text-slate-100"
+                    className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-white"
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Team Skills (comma separated):
-                </label>
-                <input
-                  type="text"
-                  value={newSkills}
-                  onChange={(e) => setNewSkills(e.target.value)}
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700/80 p-2 text-xs text-slate-100"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700"
-                >
+              <div className="flex justify-end gap-3 pt-3">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded bg-slate-800 text-slate-300">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={createLoading}
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition shadow-lg shadow-emerald-500/20"
-                >
-                  {createLoading ? "Creating..." : "Save Project"}
+                <button type="submit" className="px-5 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">
+                  Save Brief
                 </button>
               </div>
             </form>
